@@ -7,11 +7,23 @@ const Count = ({value}) =>
 const IncrementButton = ({onClick}) =>
   <button onClick={onClick}>Increment</button>;
 
-let value = 0;
+function Store() {
+  if (typeof(Storage) !== "undefined") {
+    return window.localStorage;
+  } else {
+      throw new Error('requires local storage');
+  }
+}
+
+const store = Store();
+
+let value = store.getItem('value') ? parseInt(store.getItem('value'), 10) : 0;
 function increment() {
   value += 1;
+  store.setItem('value', value);
   render();
 }
+
 
 function render() {
   ReactDOM.render(<div>
