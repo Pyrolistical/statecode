@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import axios from 'axios';
+import SortedSet from 'collections/sorted-set';
 
 const Count = ({value}) =>
   <h1>{value}</h1>;
@@ -12,37 +13,74 @@ function Store() {
   if (typeof(Storage) !== "undefined") {
     return window.localStorage;
   } else {
-      throw new Error('requires local storage');
+    throw new Error('requires local storage');
   }
 }
 
 const backend = 'http://localhost:9080';
 
 const store = Store();
+const eventQueue = restoreEventQueue();
+
+function restoreEventQueue() {
+  const eventQueue = SortedSet([], Object.equals, (left, right) => Object.compare(left.timestamp, right.timestamp));
+  if (store.getItem('pending events')) {
+    try {
+      return eventQueue.concat(JSON.parse(store.getItem('pending events')));
+    } catch (error) {
+      store.removeItem('pending events');
+    }
+  }
+
+  return eventQueue;
+}
 
 function restoreState() {
-  return axios.get(`${backend}/value`)
+  return axios.get(`${backend}/state`)
     .catch((error) => {
-      return store.getItem('value') ? parseInt(store.getItem('value'), 10) : 0;
+      return {
+        timestamp: 0,
+        value: 0
+      };
     });
 }
 
 restoreState()
-  .then((storedValue) => {
-    let value = storedValue;
+  .then((lastestState) => {
+    let state = lastestState;
+    reduce();
+
+    function reduce() {
+      let next;
+      while (next = eventQueue.findLeastGreaterThan(state)) {
+        const nextState = next.value;
+        switch (nextState.event) {
+          case 'increment':
+            state = {
+              timestamp: nextState.timestamp,
+              value: state.value + 1
+            };
+            break;
+          default:
+            throw new Error(`unknown event ${nextState.event}`);
+        }
+      }
+      render();
+    }
 
     function increment() {
-      value += 1;
-      store.setItem('value', value);
-      render();
+      eventQueue.push({
+        timestamp: Date.now(),
+        event: 'increment'
+      });
+      store.setItem('pending events', JSON.stringify(eventQueue.toJSON()));
+      reduce();
     }
 
     function render() {
       ReactDOM.render(<div>
-        <Count value={value}/>
+        <Count value={state.value}/>
         <IncrementButton onClick={increment}/>
       </div>, document.getElementById('main'));
     }
-
-    render();
   });
