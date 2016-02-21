@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import axios from 'axios';
 
 const Count = ({value}) =>
   <h1>{value}</h1>;
@@ -15,21 +16,33 @@ function Store() {
   }
 }
 
+const backend = 'http://localhost:9080';
+
 const store = Store();
 
-let value = store.getItem('value') ? parseInt(store.getItem('value'), 10) : 0;
-function increment() {
-  value += 1;
-  store.setItem('value', value);
-  render();
+function restoreState() {
+  return axios.get(`${backend}/value`)
+    .catch((error) => {
+      return store.getItem('value') ? parseInt(store.getItem('value'), 10) : 0;
+    });
 }
 
+restoreState()
+  .then((storedValue) => {
+    let value = storedValue;
 
-function render() {
-  ReactDOM.render(<div>
-    <Count value={value}/>
-    <IncrementButton onClick={increment}/>
-  </div>, document.getElementById('main'));
-}
+    function increment() {
+      value += 1;
+      store.setItem('value', value);
+      render();
+    }
 
-render();
+    function render() {
+      ReactDOM.render(<div>
+        <Count value={value}/>
+        <IncrementButton onClick={increment}/>
+      </div>, document.getElementById('main'));
+    }
+
+    render();
+  });

@@ -11,11 +11,17 @@ module.exports = {
     loaders: [
       {
         test: /\.jsx?$/,
-        loaders: ['babel?cacheDirectory']
+        loader: 'babel',
+        query: {
+          cacheDirectory: 'cacheDirectory'
+        }
       },
       {
         test: /\.html$/,
-        loader: "file?name=[name].[ext]",
+        loader: 'file',
+        query: {
+          name: '[name].[ext]'
+        }
       }
     ]
   }
