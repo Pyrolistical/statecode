@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import axios from 'axios';
 import SortedSet from 'collections/sorted-set';
+import R from 'ramda';
 import reducer from '../../reducer/main';
 
 const Count = ({value}) =>
@@ -21,7 +22,7 @@ function Store() {
 const backend = 'http://localhost:9080';
 
 const store = Store();
-const eventQueue = restoreEventQueue();
+let eventQueue = restoreEventQueue();
 
 function restoreEventQueue() {
   const eventQueue = SortedSet([], Object.equals, (left, right) => Object.compare(left.timestamp, right.timestamp));
@@ -38,6 +39,7 @@ function restoreEventQueue() {
 
 function restoreState() {
   return axios.get(`${backend}/state`)
+    .then((response) => response.data)
     .catch((error) => {
       return {
         timestamp: 0,
@@ -52,14 +54,26 @@ restoreState()
     reduce();
 
     function reduce() {
+      const events = eventQueue.toJSON();
+      store.setItem('pending events', JSON.stringify(events));
       let next;
       while (next = eventQueue.findLeastGreaterThan(state)) {
         const currentState = next.value;
-        const nextState = reducer(state, currentState.event);
+        const nextState = reducer(state, currentState);
         nextState.timestamp = currentState.timestamp;
         state = nextState;
       }
       render();
+      if (!R.isEmpty(events)) {
+        axios.post(`${backend}/events`, events)
+          .then((response) => {
+            eventQueue = eventQueue.difference(eventQueue.slice(eventQueue.findLeastGreaterThan(response.data)));
+            store.setItem('pending events', JSON.stringify(eventQueue.toJSON()));
+          })
+          .catch((error) => {
+            //ignore error, will catch up later
+          });
+      }
     }
 
     function increment() {
@@ -67,7 +81,6 @@ restoreState()
         timestamp: Date.now(),
         event: 'increment'
       });
-      store.setItem('pending events', JSON.stringify(eventQueue.toJSON()));
       reduce();
     }
 
@@ -77,4 +90,5 @@ restoreState()
         <IncrementButton onClick={increment}/>
       </div>, document.getElementById('main'));
     }
-  });
+  })
+  .catch((error) => console.log);
