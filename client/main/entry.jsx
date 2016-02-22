@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import axios from 'axios';
 import SortedSet from 'collections/sorted-set';
+import reducer from '../../reducer/main';
 
 const Count = ({value}) =>
   <h1>{value}</h1>;
@@ -53,17 +54,10 @@ restoreState()
     function reduce() {
       let next;
       while (next = eventQueue.findLeastGreaterThan(state)) {
-        const nextState = next.value;
-        switch (nextState.event) {
-          case 'increment':
-            state = {
-              timestamp: nextState.timestamp,
-              value: state.value + 1
-            };
-            break;
-          default:
-            throw new Error(`unknown event ${nextState.event}`);
-        }
+        const currentState = next.value;
+        const nextState = reducer(state, currentState.event);
+        nextState.timestamp = currentState.timestamp;
+        state = nextState;
       }
       render();
     }
